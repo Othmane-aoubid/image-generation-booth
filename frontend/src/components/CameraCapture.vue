@@ -148,54 +148,19 @@ export default {
       }
 
       try {
-        this.toast.info("Processing image...");
-        
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0);
 
-        // Convert canvas to blob
-        const blob = await new Promise((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.9)
-        );
-
-        // Create FormData
-        const formData = new FormData();
-        formData.append("image", blob, "image.jpg");
-        formData.append("model_id", this.selectedModel);
-        formData.append(
-          "prompt",
-          this.models.find((m) => m.id === this.selectedModel)?.prompt || ""
-        );
-
-        // Send to backend
-        const response = await fetch("http://localhost:5000/generate", {
-          method: "POST",
-          body: formData,
-        });
-
-        const result = await response.json();
+        // Convert to base64 and emit
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        this.$emit("image-captured", { dataUrl });
         
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || "Failed to process image");
-        }
-
-        // Emit both the original and generated images
-        this.$emit("image-generated", {
-          original: canvas.toDataURL("image/jpeg"),
-          generated: result.image_url,
-          modelId: this.selectedModel,
-          modelName: this.models.find(m => m.id === this.selectedModel)?.name
-        });
-        
-        this.toast.success("Image generated successfully!");
       } catch (error) {
-        console.error("Error processing image:", error);
-        this.toast.error(
-          error.message || "Failed to process image. Please try again."
-        );
+        console.error("Error capturing image:", error);
+        this.toast.error("Failed to capture image. Please try again.");
       }
     },
   },

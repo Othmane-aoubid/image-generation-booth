@@ -7,7 +7,13 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6">
-      <div v-if="processedImage" class="mb-8">
+      <ImageGrid 
+        @model-selected="handleModelSelect" 
+        :showCamera="showCamera"
+        @close-camera="showCamera = false"
+      />
+
+      <div v-if="processedImage" class="mt-8">
         <div class="bg-gray-800 rounded-lg p-4">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold">Generated Image</h2>
@@ -31,14 +37,8 @@
         </div>
       </div>
 
-      <ImageGrid 
-        @model-selected="handleModelSelect" 
-        :showCamera="showCamera"
-        @close-camera="showCamera = false"
-      />
-
       <!-- Camera Modal -->
-      <div v-if="showCamera" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50">
+      <div v-if="showCamera && !isGenerating" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50">
         <div class="absolute inset-0 flex items-center justify-center p-4">
           <div class="bg-gray-800 rounded-xl w-full max-w-4xl">
             <div class="p-6">
@@ -59,12 +59,25 @@
           </div>
         </div>
       </div>
+
+      <!-- Loading Modal -->
+      <div v-if="isGenerating" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50">
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+          <div class="bg-gray-800 rounded-xl w-full max-w-xl p-8">
+            <div class="flex flex-col items-center justify-center">
+              <div class="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p class="text-purple-400 text-lg">Generating your image...</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script>
 import { ref } from "vue";
+import { useToast } from "vue-toastification";
 import ImageGrid from "./components/ImageGrid.vue";
 import CameraCapture from "./components/CameraCapture.vue";
 
@@ -78,39 +91,47 @@ export default {
     const processedImage = ref(null);
     const selectedModel = ref("");
     const showCamera = ref(false);
+    const isGenerating = ref(false);
+    const toast = useToast();
 
     const handleModelSelect = (modelId) => {
       selectedModel.value = modelId;
       showCamera.value = true;
     };
 
-    const generateImage = async (initImage) => {
+    const handleImageCapture = async (data) => {
       try {
-        const response = await fetch("http://localhost:5000/generate", {
+        showCamera.value = false;
+        isGenerating.value = true;
+
+        // Convert base64 to blob
+        const response = await fetch(data.dataUrl);
+        const blob = await response.blob();
+
+        // Create FormData
+        const formData = new FormData();
+        formData.append("image", blob, "image.jpg");
+        formData.append("model_id", selectedModel.value);
+
+        // Send to backend
+        const apiResponse = await fetch("http://localhost:5000/generate", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: selectedModel.value,
-            init_image: initImage,
-          }),
+          body: formData,
         });
 
-        const data = await response.json();
-        processedImage.value = data.image;
-        showCamera.value = false;
-      } catch (error) {
-        console.error("Error generating image:", error);
-      }
-    };
+        const result = await apiResponse.json();
+        
+        if (!apiResponse.ok || !result.success) {
+          throw new Error(result.error || "Failed to process image");
+        }
 
-    const handleImageCapture = async (data) => {
-      processedImage.value = data.dataUrl;
-      try {
-        await generateImage(data.dataUrl);
+        processedImage.value = result.image;
+        toast.success("Image generated successfully!");
       } catch (error) {
         console.error("Error processing image:", error);
+        toast.error(error.message || "Failed to process image. Please try again.");
+      } finally {
+        isGenerating.value = false;
       }
     };
 
@@ -118,6 +139,7 @@ export default {
       processedImage,
       selectedModel,
       showCamera,
+      isGenerating,
       handleModelSelect,
       handleImageCapture,
     };
