@@ -1,34 +1,32 @@
 <template>
-  <div class="fixed bottom-0 left-0 right-0 p-4 bg-white shadow-lg">
-    <div class="max-w-4xl mx-auto">
-      <div v-if="showPreview" class="relative mb-4">
-        <video 
-          ref="video"
-          class="w-full h-64 object-cover rounded-lg"
-          autoplay
-          muted
-          playsinline
-        ></video>
-      </div>
-      <div class="flex justify-between items-center">
-        <select 
-          v-model="selectedModel" 
-          class="p-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        >
-          <option value="" disabled>Select Model</option>
-          <option v-for="model in models" :key="model.id" :value="model.id">
-            {{ model.name }}
-          </option>
-        </select>
-        <button 
-          @click="captureImage" 
-          class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
-          :disabled="!selectedModel"
-        >
-          <span class="material-icons mr-2">photo_camera</span>
-          Take Photo
-        </button>
+  <div class="relative">
+    <div v-if="showPreview" class="relative mb-6">
+      <video
+        ref="video"
+        class="w-full h-[400px] object-cover rounded-lg bg-black"
+        autoplay
+        muted
+        playsinline
+      ></video>
+      <div class="absolute inset-0 rounded-lg ring-1 ring-white/10"></div>
+    </div>
+    
+    <div class="flex justify-between items-center">
+      <button
+        @click="captureImage"
+        class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2"
+      >
+        <span class="material-icons">photo_camera</span>
+        <span>Take Photo</span>
+      </button>
+    </div>
+
+    <div v-if="!showPreview" class="mt-4 p-4 bg-gray-700/50 rounded-lg">
+      <div class="flex items-center space-x-3 text-yellow-400">
+        <span class="material-icons">warning</span>
+        <p class="text-sm">
+          Camera access is required. Please enable it in your browser settings.
+        </p>
       </div>
     </div>
   </div>
@@ -38,103 +36,183 @@
 import { useToast } from "vue-toastification";
 
 export default {
-  name: 'CameraCapture',
+  name: "CameraCapture",
+  props: {
+    externalSelectedModel: {
+      type: String,
+      default: ""
+    }
+  },
   data() {
     return {
       showPreview: false,
-      selectedModel: '',
+      selectedModel: "",
       stream: null,
       models: [
-        { 
-          id: 'model1', 
-          name: 'Style Transfer',
-          prompt: 'artistic style transfer, vibrant colors, detailed'
+        {
+          id: "model1",
+          name: "Style Transfer",
+          prompt: "artistic style transfer, vibrant colors, detailed",
         },
-        { 
-          id: 'model2', 
-          name: 'Portrait Effects',
-          prompt: 'professional portrait photography, perfect lighting'
+        {
+          id: "model2",
+          name: "Portrait Effects",
+          prompt: "professional portrait photography, perfect lighting",
         },
-        { 
-          id: 'model3', 
-          name: 'Artistic Filter',
-          prompt: 'artistic oil painting, bold brushstrokes, expressive'
-        }
+        {
+          id: "model3",
+          name: "Artistic Filter",
+          prompt: "artistic oil painting, bold brushstrokes, expressive",
+        },
       ],
-      toast: useToast()
+      toast: useToast(),
+    };
+  },
+  watch: {
+    externalSelectedModel(newVal) {
+      if (newVal && newVal !== this.selectedModel) {
+        this.selectedModel = newVal;
+      }
     }
   },
   methods: {
     async initCamera() {
       try {
-        this.stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          } 
-        });
+        this.showPreview = true; // Show video element first
+        await this.$nextTick(); // Wait for DOM update
+
         const video = this.$refs.video;
+        if (!video) {
+          throw new Error("Video element not found");
+        }
+
+        // First check if camera permissions are granted
+        const permissions = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        permissions.getTracks().forEach((track) => track.stop()); // Stop the test stream
+
+        // Now initialize with desired settings
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+
         video.srcObject = this.stream;
-        await new Promise(resolve => video.onloadedmetadata = resolve);
-        this.showPreview = true;
+
+        // Wait for video to be ready with increased timeout
+        await Promise.race([
+          new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+              video.play().then(resolve);
+            };
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Video initialization timeout")), 15000)
+          ),
+        ]);
+
       } catch (error) {
-        console.error('Error accessing camera:', error);
-        this.toast.error('Camera access is required for this feature. Please enable camera permissions.');
+        console.error("Error accessing camera:", error);
+        this.showPreview = false;
+        
+        if (error.name === "NotAllowedError") {
+          this.toast.error(
+            "Camera access denied. Please enable camera permissions in your browser."
+          );
+        } else if (error.name === "NotFoundError") {
+          this.toast.error(
+            "No camera found. Please ensure your device has a camera and try again."
+          );
+        } else if (
+          error.name === "AbortError" ||
+          error.message.includes("timeout")
+        ) {
+          this.toast.error(
+            "Camera initialization timed out. Please try again or check your camera settings."
+          );
+        } else {
+          this.toast.error(
+            "Failed to initialize camera. Please refresh the page and try again."
+          );
+        }
+        throw error;
       }
     },
     async captureImage() {
       if (!this.selectedModel) {
-        this.toast.warning('Please select a model first');
+        this.toast.warning("Please select a model first");
         return;
       }
 
       const video = this.$refs.video;
-      if (!video.videoWidth || !video.videoHeight) {
-        this.toast.error('Camera not ready. Please try again.');
+      if (!video || !video.videoWidth || !video.videoHeight) {
+        this.toast.error("Camera not ready. Please try again.");
         return;
       }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      
       try {
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/jpeg', 0.9)
-        });
+        this.toast.info("Processing image...");
         
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+
+        // Convert canvas to blob
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.9)
+        );
+
+        // Create FormData
         const formData = new FormData();
-        formData.append('image', blob, 'capture.jpg');
-        formData.append('model', this.selectedModel);
-        
-        // TODO: Add API call to your Stable Diffusion backend here
-        // const response = await fetch('/api/generate', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-        
-        this.$emit('image-captured', { 
-          blob, 
-          model: this.selectedModel,
-          dataUrl: canvas.toDataURL('image/jpeg', 0.9)
+        formData.append("image", blob, "image.jpg");
+        formData.append("model_id", this.selectedModel);
+        formData.append(
+          "prompt",
+          this.models.find((m) => m.id === this.selectedModel)?.prompt || ""
+        );
+
+        // Send to backend
+        const response = await fetch("http://localhost:5000/generate", {
+          method: "POST",
+          body: formData,
         });
-        this.toast.success('Image captured successfully!');
+
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Failed to process image");
+        }
+
+        // Emit both the original and generated images
+        this.$emit("image-generated", {
+          original: canvas.toDataURL("image/jpeg"),
+          generated: result.image_url,
+          modelId: this.selectedModel,
+          modelName: this.models.find(m => m.id === this.selectedModel)?.name
+        });
+        
+        this.toast.success("Image generated successfully!");
       } catch (error) {
-        console.error('Error capturing image:', error);
-        this.$emit('capture-error', error);
-        this.toast.error('Failed to capture image. Please try again.');
+        console.error("Error processing image:", error);
+        this.toast.error(
+          error.message || "Failed to process image. Please try again."
+        );
       }
-    }
+    },
   },
   mounted() {
     this.initCamera();
   },
   beforeUnmount() {
     if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
+      this.stream.getTracks().forEach((track) => track.stop());
     }
-  }
-}
+  },
+};
 </script>
