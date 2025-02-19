@@ -1,11 +1,5 @@
 <template>
   <div class="relative">
-    <div v-if="!selectedModel" class="mb-4 p-4 bg-yellow-500/10 rounded-lg">
-      <div class="flex items-center space-x-3 text-yellow-400">
-        <span class="material-icons">info</span>
-        <p class="text-sm">Please select a model first</p>
-      </div>
-    </div>
     <div v-if="showPreview" class="relative mb-6">
       <video
         ref="video"
