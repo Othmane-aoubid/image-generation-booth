@@ -1,5 +1,11 @@
 <template>
   <div class="relative">
+    <div v-if="!selectedModel" class="mb-4 p-4 bg-yellow-500/10 rounded-lg">
+      <div class="flex items-center space-x-3 text-yellow-400">
+        <span class="material-icons">info</span>
+        <p class="text-sm">Please select a model first</p>
+      </div>
+    </div>
     <div v-if="showPreview" class="relative mb-6">
       <video
         ref="video"
@@ -14,7 +20,8 @@
     <div class="flex justify-between items-center">
       <button
         @click="captureImage"
-        class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2"
+        :disabled="!selectedModel"
+        class="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 flex items-center space-x-2"
       >
         <span class="material-icons">photo_camera</span>
         <span>Take Photo</span>
@@ -38,7 +45,7 @@ import { useToast } from "vue-toastification";
 export default {
   name: "CameraCapture",
   props: {
-    externalSelectedModel: {
+    selectedModel: {
       type: String,
       default: ""
     }
@@ -46,7 +53,6 @@ export default {
   data() {
     return {
       showPreview: false,
-      selectedModel: "",
       stream: null,
       models: [
         {
@@ -67,13 +73,6 @@ export default {
       ],
       toast: useToast(),
     };
-  },
-  watch: {
-    externalSelectedModel(newVal) {
-      if (newVal && newVal !== this.selectedModel) {
-        this.selectedModel = newVal;
-      }
-    }
   },
   methods: {
     async initCamera() {

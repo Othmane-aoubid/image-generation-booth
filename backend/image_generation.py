@@ -8,7 +8,8 @@ from PIL import Image
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-SD_API_URL = "https://16e9dcbb5efb6c24e0.gradio.live/sdapi/v1/img2img"
+# SD_API_URL = "https://16e9dcbb5efb6c24e0.gradio.live/sdapi/v1/img2img"
+SD_API_URL = "https://a798a77afb1660c582.gradio.live/sdapi/v1/img2img"
 
 def image_to_base64(image_data):
     # Convert PIL Image to base64
