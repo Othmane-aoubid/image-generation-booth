@@ -120,12 +120,14 @@ export default {
         });
 
         const result = await apiResponse.json();
+        console.log('Backend response:', result);
         
         if (!apiResponse.ok || !result.success) {
           throw new Error(result.error || "Failed to process image");
         }
 
-        processedImage.value = result.image;
+        console.log('Setting processed image:', result.image);
+        processedImage.value = result.image_url || result.image; // Try both possible response formats
         toast.success("Image generated successfully!");
       } catch (error) {
         console.error("Error processing image:", error);

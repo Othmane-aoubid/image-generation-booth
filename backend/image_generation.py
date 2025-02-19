@@ -24,19 +24,19 @@ def generate_image(prompt, image_data, model_id=""):
     # Customize settings based on model_id
     settings = {
         "model1": {  # Style Transfer
-            "steps": 20,
+            "steps": 2,
             "guidance_start": 0.3,
             "guidance_end": 0.7,
             "weight": 1.0
         },
         "model2": {  # Portrait Effects
-            "steps": 15,
+            "steps": 2,
             "guidance_start": 0.4,
             "guidance_end": 0.8,
             "weight": 1.1
         },
         "model3": {  # Artistic Filter
-            "steps": 25,
+            "steps": 2,
             "guidance_start": 0.2,
             "guidance_end": 0.9,
             "weight": 1.3
